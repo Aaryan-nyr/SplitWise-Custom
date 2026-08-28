@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: household-split-db
+    restart: unless-stopped
+    environment:
+      env_file: .env.local
+    ports:
+      - "5432:5432"
+    volumes:
+      - household-split-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER} -d $${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  household-split-db:

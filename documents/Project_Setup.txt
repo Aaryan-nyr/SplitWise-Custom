@@ -1,0 +1,533 @@
+# Household Management Web App - Project Handoff & Technical Architecture
+
+## 🎯 Executive Summary & Objectives
+
+This project is a containerized full-stack household management web application designed for a two-person household. The goal is to build a collaborative app (expenses, chores, to-dos) while practicing modern system design: containerization on Azure, OAuth integration, event scheduling, and asynchronous notification delivery.
+
+---
+
+## 🛠️ Stack & Infrastructure Architecture
+
+* **Frontend & Backend Framework:** Next.js (App Router, TypeScript)
+* **Database & ORM:** PostgreSQL + Prisma ORM
+* **Authentication:** NextAuth.js / Auth.js (Google OAuth with offline access for Google Calendar integration)
+* **Email Service:** Resend API
+* **Deployment Platform:** Azure Container Apps (ACA)
+* **Managed Database:** Azure Database for PostgreSQL (Flexible Server)
+* **Local Development Environment:** Docker & Docker Compose (`docker-compose.yml`)
+
+---
+
+## 🌐 Azure Free Tier Strategy & Compute Lifecycle
+
+To run the application indefinitely within Azure's free tier allowances, the compute and database environments are configured to strict specifications.
+
+**Infrastructure Configuration Settings**
+
+* **Azure Container Apps:** Allocated $0.25\text{ vCPU}$ and $0.5\text{ GiB RAM}$. Configured with `minReplicas: 0` to allow the container to scale down to zero when idle and avoid continuous runtime charges.
+* **Inactivity & Cold Starts:** After a few minutes of zero HTTP traffic, Azure scales the app instance to zero replicas. The first incoming HTTP request wakes the container, causing a minor cold-start delay (5–10 seconds).
+* **Database:** Azure Database for PostgreSQL (Flexible Server) set to `Burstable Standard_B1ms` ($1\text{ vCPU}$, $2\text{ GiB RAM}$) with strictly $32\text{ GB}$ storage.
+* **Persistent Storage:** Local container filesystems are ephemeral. State is offloaded entirely to the managed PostgreSQL database.
+
+---
+
+## 📬 Notification Engine: The Transactional Outbox Pattern
+
+To implement asynchronous notifications and event processing (e.g., notifying Partner 2 when Partner 1 completes a task) without continuous running background workers or extra message queue infrastructure (e.g., Redis/Service Bus), the architecture utilizes a **Transactional Outbox Pattern** combined with an **External Cron Trigger**.
+
+```
+[ User Action ] ───► ( Single Atomic DB Transaction )
+                             │
+                             ├─► Update Feature Record (e.g., TodoItem)
+                             └─► Create OutboxEvent (status = PENDING)
+                                         │
+[ External Cron Trigger ] ───────────────┼───► Hits /api/cron/process-outbox (every 5-15 mins)
+                                         │
+                                         ▼
+                               [ Next.js API Handler ]
+                                         │
+                                         ├─► Query: PENDING events
+                                         ├─► Dispatch Emails / In-App Notifications
+                                         └─► Update OutboxEvent (status = PROCESSED)
+
+```
+
+---
+
+## 📊 Complete Database Schema Design (Prisma)
+
+The Prisma schema incorporates core entities alongside accounts, tokens, notifications, calendar sync, and the event outbox queue.
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// System Enums
+enum EventStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+// 1. User & Auth Setup
+model User {
+  id                String              @id @default(cuid())
+  name              String?
+  email             String              @unique
+  image             String?
+  accounts          Account[]
+  expensesPaid      Expense[]           @relation("ExpensesPaid")
+  expenseSplits     ExpenseSplit[]
+  todoItems         TodoItem[]          @relation("AssignedTodos")
+  activities        HouseholdActivity[] @relation("AssignedActivities")
+  notifications     Notification[]
+  calendarEvents    CalendarEvent[]
+  createdAt         DateTime            @default(now())
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// 2. Core Household Features
+model TodoList {
+  id        String     @id @default(cuid())
+  title     String
+  items     TodoItem[]
+  createdAt DateTime   @default(now())
+}
+
+model TodoItem {
+  id           String    @id @default(cuid())
+  title        String
+  isCompleted  Boolean   @default(false)
+  listId       String
+  list         TodoList  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  assignedToId String?
+  assignedTo   User?     @relation("AssignedTodos", fields: [assignedToId], references: [id])
+  createdAt    DateTime  @default(now())
+}
+
+model Expense {
+  id          String         @id @default(cuid())
+  title       String
+  totalAmount Float
+  paidById    String
+  paidBy      User           @relation("ExpensesPaid", fields: [paidById], references: [id])
+  splits      ExpenseSplit[]
+  createdAt   DateTime       @default(now())
+}
+
+model ExpenseSplit {
+  id         String   @id @default(cuid())
+  expenseId  String
+  expense    Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  percentage Float
+  amountOwed Float
+}
+
+model HouseholdActivity {
+  id           String   @id @default(cuid())
+  title        String
+  dayOfWeek    String
+  isDone       Boolean  @default(false)
+  assignedToId String?
+  assignedTo   User?    @relation("AssignedActivities", fields: [assignedToId], references: [id])
+}
+
+// 3. Calendar Integration
+model CalendarEvent {
+  id              String     @id @default(cuid())
+  externalEventId String     @unique // Google Calendar eventId
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  startTime       DateTime
+  endTime         DateTime
+  syncStatus      SyncStatus @default(PENDING)
+  lastSyncedAt    DateTime   @default(now())
+}
+
+// 4. Notifications & Outbox Queue
+model OutboxEvent {
+  id          String      @id @default(cuid())
+  eventType   String      // e.g., "TASK_COMPLETED", "CHORE_REASSIGNED"
+  recipientId String      // Target User ID
+  payload     Json        // Serialized context (e.g., task name, action URL)
+  status      EventStatus @default(PENDING)
+  retryCount  Int         @default(0)
+  createdAt   DateTime    @default(now())
+  processedAt DateTime?
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+```
+
+---
+
+## 🚀 Step-by-Step Implementation Roadmap
+
+**Phase 1: Local Setup & Core Models**
+
+1. Initialize local PostgreSQL via `docker-compose.yml`.
+2. Apply the Prisma schema using `npx prisma db push`.
+3. Configure Google OAuth with requested scopes: `[https://www.googleapis.com/auth/calendar.events](https://www.googleapis.com/auth/calendar.events)` and offline access parameters (`access_type=offline`, `prompt=consent`).
+
+**Phase 2: Atomic Server Actions & Outbox Writers**
+
+1. Write Server Actions for user triggers (e.g., completing a task, updating an expense).
+2. Wrap state changes and outbox event creation into Prisma atomic transactions:
+`prisma.$transaction([ updateTask, createOutboxEvent ])`
+
+**Phase 3: Background Processor & API Endpoint**
+
+1. Create protected Next.js API Route at `/api/cron/process-outbox`.
+2. Implement route authorization using a Bearer token verification check against an environment variable (`CRON_SECRET`).
+3. Add processing logic:
+* Query `OutboxEvent` records where `status = PENDING`.
+* Convert outbox records into `Notification` rows or push emails/calendar sync requests.
+* Update `OutboxEvent` records to `PROCESSED`.
+
+
+
+**Phase 4: Scheduler Integration & Azure Deployment**
+
+1. Build production `Dockerfile` for Next.js.
+2. Deploy app to Azure Container Apps (`minReplicas: 0`, `0.25 vCPU`) attached to Azure Database for PostgreSQL.
+3. Configure a free external scheduler (e.g., Cron-Job.org or GitHub Actions workflow) to send a periodic HTTP `POST` request to `/api/cron/process-outbox` every 5–15 minutes.
+
+
+// chat v2
+# Project Handoff & Architecture: Household Management Web App
+
+## 🎯 Architectural Overview
+
+This full-stack application enables a two-person household to manage shared expenses, chores, and calendars. The architecture prioritizes a zero-cost serverless lifecycle on Azure, end-to-end type safety, and asynchronous task delivery.
+
+```
+[ User Browser / UI ]
+        │
+        ▼ (Type-Safe Server Actions & Routes)
+[ Next.js App Router (TypeScript) ]
+        │
+        ├─► [ NextAuth.js ] ──► (Google OAuth 2.0 with Offline Calendar Scope)
+        │
+        ├─► [ Prisma ORM Client ]
+        │           │
+        │           ▼
+        └─► [ Azure PostgreSQL (Flexible Server) ]
+                    │
+                    ▼ (Atomic Transaction: Core Update + Outbox Sync)
+            [ Transactional Outbox Pattern ] ◄── [ External Cron Trigger ]
+
+```
+
+---
+
+## 🛠️ Stack Specifications
+
+* **Frontend & Server Framework:** Next.js (App Router, React, TypeScript)
+
+
+* **Database & ORM:** PostgreSQL + Prisma ORM
+
+
+* **Authentication:** NextAuth.js (Google OAuth 2.0 with `access_type=offline`)
+
+
+* **Email & External Services:** Resend API & Google Calendar API
+
+
+* **Hosting & Compute:** Azure Container Apps (ACA)
+
+
+* **Managed Database:** Azure Database for PostgreSQL (Flexible Server)
+
+
+* **Local Development Environment:** Docker & Docker Compose
+
+
+
+---
+
+## ⚡ Hosting & Free-Tier Lifecycle
+
+* **Azure Container Apps:** Provisioned with $0.25\text{ vCPU}$ and $0.5\text{ GiB RAM}$. `minReplicas` is set to `0` so the application scales down to zero when idle to prevent compute charges.
+
+
+* **Cold Starts:** After zero web traffic, idle containers spin down. Waking the container via an incoming HTTP request incurs a 5–10 second delay.
+
+
+* **Database Instance:** Configured on `Burstable Standard_B1ms` ($1\text{ vCPU}$, $2\text{ GiB RAM}$) capped at $32\text{ GB}$ storage. State resides entirely in PostgreSQL.
+
+
+
+---
+
+## 📬 Transactional Outbox Engine
+
+To prevent missing notifications without using a continuously running queue service (e.g., Redis), events write atomically to an outbox table and process on an external schedule:
+
+```
+1. User Action ──► Atomic Transaction: Update Data + Create OutboxEvent (PENDING)
+2. Cron Ping   ──► POST /api/cron/process-outbox (every 5-15 mins)
+3. Processing  ──► Fetch PENDING events ──► Dispatch Email/Calendar Sync ──► Set Event PROCESSED
+
+```
+
+---
+
+## 📊 Complete Database Schema (`prisma/schema.prisma`)
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum EventStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+model User {
+  id                String              @id @default(cuid())
+  name              String?
+  email             String              @unique
+  image             String?
+  accounts          Account[]
+  expensesPaid      Expense[]           @relation("ExpensesPaid")
+  expenseSplits     ExpenseSplit[]
+  todoItems         TodoItem[]          @relation("AssignedTodos")
+  activities        HouseholdActivity[] @relation("AssignedActivities")
+  notifications     Notification[]
+  calendarEvents    CalendarEvent[]
+  createdAt         DateTime            @default(now())
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model TodoList {
+  id        String     @id @default(cuid())
+  title     String
+  items     TodoItem[]
+  createdAt DateTime   @default(now())
+}
+
+model TodoItem {
+  id           String    @id @default(cuid())
+  title        String
+  isCompleted  Boolean   @default(false)
+  listId       String
+  list         TodoList  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  assignedToId String?
+  assignedTo   User?     @relation("AssignedTodos", fields: [assignedToId], references: [id])
+  createdAt    DateTime  @default(now())
+}
+
+model Expense {
+  id          String         @id @default(cuid())
+  title       String
+  totalAmount Float
+  paidById    String
+  paidBy      User           @relation("ExpensesPaid", fields: [paidById], references: [id])
+  splits      ExpenseSplit[]
+  createdAt   DateTime       @default(now())
+}
+
+model ExpenseSplit {
+  id         String   @id @default(cuid())
+  expenseId  String
+  expense    Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  percentage Float
+  amountOwed Float
+}
+
+model HouseholdActivity {
+  id           String   @id @default(cuid())
+  title        String
+  dayOfWeek    String
+  isDone       Boolean  @default(false)
+  assignedToId String?
+  assignedTo   User?    @relation("AssignedActivities", fields: [assignedToId], references: [id])
+}
+
+model CalendarEvent {
+  id              String     @id @default(cuid())
+  externalEventId String     @unique
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  startTime       DateTime
+  endTime         DateTime
+  syncStatus      SyncStatus @default(PENDING)
+  lastSyncedAt    DateTime   @default(now())
+}
+
+model OutboxEvent {
+  id          String      @id @default(cuid())
+  eventType   String      
+  recipientId String      
+  payload     Json        
+  status      EventStatus @default(PENDING)
+  retryCount  Int         @default(0)
+  createdAt   DateTime    @default(now())
+  processedAt DateTime?
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+```
+
+---
+
+## 🛠️ Step-by-Step Environment Setup
+
+### 1. Initialize Next.js & Dependencies
+
+```bash
+npx create-next-app@latest household-app \
+  --typescript \
+  --eslint \
+  --tailwind \
+  --app \
+  --src-dir \
+  --import-alias "@/*"
+
+cd household-app
+npm install @prisma/client next-auth
+npm install -D prisma
+
+```
+
+### 2. Configure Docker Compose (`docker-compose.yml`)
+
+```yaml
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: household_db
+    environment:
+      POSTGRES_USER: devuser
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: household_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+
+```
+
+### 3. Initialize Prisma & Local Database
+
+```bash
+npx prisma init
+
+```
+
+Set `.env`:
+
+```env
+DATABASE_URL="postgresql://devuser:devpassword@localhost:5432/household_dev?schema=public"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your-development-secret-key"
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+RESEND_API_KEY="your-resend-key"
+CRON_SECRET="your-cron-secret"
+
+```
+
+Apply schema and launch services:
+
+```bash
+docker compose up -d
+npx prisma db push
+npx prisma generate
+
+```
+
+### 4. Running Local Development
+
+* **Next.js App:** `npm run dev` $\rightarrow$ `http://localhost:3000`
+* **Prisma GUI:** `npx prisma studio` $\rightarrow$ `

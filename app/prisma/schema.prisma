@@ -1,0 +1,240 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum EventStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String?
+  email         String   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  memberships    HouseholdMember[]
+  expensesPaid   Expense[]           @relation("ExpensesPaid")
+  expenseSplits  ExpenseSplit[]
+  todoItems      TodoItem[]          @relation("AssignedTodos")
+  activities     HouseholdActivity[] @relation("AssignedActivities")
+  notifications  Notification[]
+  calendarEvents CalendarEvent[]
+  outboxEvents   OutboxEvent[]       @relation("OutboxRecipients")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Household {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members       HouseholdMember[]
+  todoLists     TodoList[]
+  expenses      Expense[]
+  activities    HouseholdActivity[]
+  notifications Notification[]
+  outboxEvents  OutboxEvent[]
+}
+
+model HouseholdMember {
+  householdId String
+  userId      String
+  joinedAt    DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([householdId, userId])
+  @@index([userId])
+}
+
+model TodoList {
+  id          String   @id @default(cuid())
+  householdId String
+  title       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  household Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  items      TodoItem[]
+
+  @@index([householdId])
+}
+
+model TodoItem {
+  id           String   @id @default(cuid())
+  listId       String
+  title        String
+  isCompleted  Boolean  @default(false)
+  assignedToId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  list       TodoList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  assignedTo User?    @relation("AssignedTodos", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([listId])
+  @@index([assignedToId])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  householdId String
+  title       String
+  totalAmount Decimal  @db.Decimal(12, 2)
+  paidById    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  household Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  paidBy    User           @relation("ExpensesPaid", fields: [paidById], references: [id])
+  splits    ExpenseSplit[]
+
+  @@index([householdId, createdAt])
+  @@index([paidById])
+}
+
+model ExpenseSplit {
+  id         String  @id @default(cuid())
+  expenseId  String
+  userId     String
+  percentage Decimal @db.Decimal(5, 2)
+  amountOwed Decimal @db.Decimal(12, 2)
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([expenseId, userId])
+  @@index([userId])
+}
+
+model HouseholdActivity {
+  id                 String   @id @default(cuid())
+  householdId        String
+  title              String
+  scheduledDayOfWeek Int
+  isDone             Boolean  @default(false)
+  assignedToId       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  assignedTo User?    @relation("AssignedActivities", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, scheduledDayOfWeek])
+  @@index([assignedToId])
+}
+
+model CalendarEvent {
+  id              String     @id @default(cuid())
+  externalEventId String
+  userId          String
+  title           String
+  description     String?
+  startTime       DateTime
+  endTime         DateTime
+  syncStatus      SyncStatus @default(PENDING)
+  lastSyncedAt    DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, externalEventId])
+  @@index([userId, startTime])
+}
+
+model OutboxEvent {
+  id          String      @id @default(cuid())
+  householdId String
+  eventType   String
+  recipientId String?
+  payload     Json
+  status      EventStatus @default(PENDING)
+  retryCount  Int         @default(0)
+  lastError   String?
+  createdAt   DateTime    @default(now())
+  processedAt DateTime?
+
+  household     Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  recipient     User?          @relation("OutboxRecipients", fields: [recipientId], references: [id], onDelete: SetNull)
+  notifications Notification[]
+
+  @@index([status, createdAt])
+  @@index([householdId])
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  householdId   String
+  userId        String
+  outboxEventId String?
+  title         String
+  message       String
+  isRead        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  household   Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outboxEvent OutboxEvent? @relation(fields: [outboxEventId], references: [id], onDelete: SetNull)
+
+  @@unique([outboxEventId, userId])
+  @@index([userId, isRead, createdAt])
+}
