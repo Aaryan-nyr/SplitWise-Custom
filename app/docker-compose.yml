@@ -3,8 +3,12 @@ services:
     image: postgres:16-alpine
     container_name: household-split-db
     restart: unless-stopped
+    env_file: 
+      - .env.local
     environment:
-      env_file: .env.local
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
