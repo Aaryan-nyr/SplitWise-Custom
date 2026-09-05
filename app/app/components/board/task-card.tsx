@@ -11,6 +11,7 @@ export type Task = {
   description: string | null;
   createdBy: string;
   assignedTo: string;
+  assignedToId: string | null;
   lastEditedBy: string;
   updatedAt: Date;
   status: BoardStatus;

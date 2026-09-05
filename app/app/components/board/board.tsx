@@ -6,46 +6,17 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import { BoardColumn } from "./board-column";
+import { TaskDetailCard } from "./task-detail-card";
 import { BoardStatus, Task } from "./task-card";
 
 const statuses: BoardStatus[] = ["TODO", "INPROGRESS", "DONE", "OBSOLETE"];
 
-const initialTasks: Task[] = [
-  {
-    id: "welcome-board", title: "Plan the weekend groceries", description: "Make a list of essentials before the Saturday shop.", status: "TODO", priority: "MEDIUM", assignee: "AB",
-    createdBy: "",
-    assignedTo: "",
-    lastEditedBy: "",
-    updatedAt: new Date()  },
-  {
-    id: "schedule-repairs",
-    title: "Schedule boiler inspection",
-    description: "Call the building manager and confirm a time.",
-    status: "INPROGRESS",
-    priority: "HIGH",
-    assignee: "JS",
-    createdBy: "",
-    assignedTo: "",
-    lastEditedBy: "",
-    updatedAt: new Date(),
-  },
-  {
-    id: "update-budget",
-    title: "Update monthly budget",
-    description: "Review the shared expenses from last month.",
-    status: "DONE",
-    priority: "LOW",
-    assignee: "AB",
-    createdBy: "",
-    assignedTo: "",
-    lastEditedBy: "",
-    updatedAt: new Date(),
-  },
-];
+type Assignee = { id: string; name: string };
 
-export function Board() {
+export function Board({ initialTasks, assignees }: { initialTasks: Task[]; assignees: Assignee[] }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isPopUpOpen, setIsPopUpOpen] = useState(false);
 
@@ -53,6 +24,28 @@ export function Board() {
     setSelectedTask(task);
     setIsPopUpOpen(true);
   };
+
+  async function updateTask(updatedTask: Task) {
+    const response = await fetch(`/api/todos/${updatedTask.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: updatedTask.title,
+        description: updatedTask.description,
+        status: updatedTask.status,
+        priority: updatedTask.priority,
+        assignedToId: updatedTask.assignedToId,
+      }),
+    });
+
+    const result = await response.json() as Task | { error?: string };
+    if (!response.ok || !("id" in result)) {
+      throw new Error("error" in result ? result.error : "The task could not be saved.");
+    }
+
+    setTasks((currentTasks) => currentTasks.map((task) => task.id === result.id ? result : task));
+    setSelectedTask(result);
+  }
 
   function moveDraggedTask(status: BoardStatus) {
     if (!draggedTaskId) return;
@@ -72,6 +65,7 @@ export function Board() {
       assignee: "ME",
       createdBy: "ME",
       assignedTo: "ME",
+      assignedToId: null,
       lastEditedBy: "ME",
       updatedAt: new Date(),
     }]);
@@ -90,6 +84,7 @@ export function Board() {
       <div className="grid gap-4 overflow-x-auto pb-4 xl:grid-cols-4">
         {statuses.map((status) => <BoardColumn key={status} status={status} tasks={tasks.filter((task) => task.status === status)} onDragStart={setDraggedTaskId} onDrop={moveDraggedTask} onTaskSelect={handleTaskClick} onAddTask={() => addTask(status)} />)}
       </div>
+      {isPopUpOpen && selectedTask && <TaskDetailCard task={selectedTask} assignees={assignees} onClose={() => setIsPopUpOpen(false)} onSave={updateTask} />}
     </section>
   );
 }
