@@ -10,9 +10,10 @@ type TaskPriority = Task["priority"];
 
 type TaskDetailCardProps = {
   task: Task;
+  mode: "create" | "edit";
   assignees: { id: string; name: string }[];
   onClose: () => void;
-  onSave: (task: Task) => Promise<void>;
+  onSave: (task: Task, mode: "create" | "edit") => Promise<void>;
 };
 
 const statuses: BoardStatus[] = ["TODO", "INPROGRESS", "DONE", "OBSOLETE"];

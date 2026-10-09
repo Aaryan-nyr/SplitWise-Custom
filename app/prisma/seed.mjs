@@ -1,25 +1,29 @@
 import dotenv from "dotenv";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
-import { v4 as uuidv4 } from "uuid";
 
 dotenv.config({ path: ".env.local" });
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-const aliceId = uuidv4();
-const jordanId = uuidv4();
-const householdId = uuidv4();
-const listId = uuidv4();
+const aliceId = "mock-alice-user";
+const jordanId = "mock-jordan-user";
+const householdId = "mock-household";
+const listId = "mock-todolist";
+const mockEmails = ["alice.mock@example.com", "jordan.mock@example.com"];
 
 async function main() {
-  await prisma.taskComment.deleteMany({ where: { todoItem: { listId } } });
-  await prisma.todoItem.deleteMany({ where: { listId } });
-  await prisma.todoList.deleteMany({ where: { id: listId } });
-  await prisma.householdMember.deleteMany({ where: { householdId } });
-  await prisma.household.deleteMany({ where: { id: householdId } });
-  await prisma.user.deleteMany({ where: { id: { in: [aliceId, jordanId] } } });
+  await prisma.taskComment.deleteMany({
+    where: { todoItem: { list: { title: "Weekly ToDos" } } },
+  });
+  await prisma.todoItem.deleteMany({ where: { list: { title: "Weekly ToDos" } } });
+  await prisma.todoList.deleteMany({ where: { title: "Weekly ToDos" } });
+  await prisma.householdMember.deleteMany({
+    where: { household: { name: "Mock Household" } },
+  });
+  await prisma.household.deleteMany({ where: { name: "Mock Household" } });
+  await prisma.user.deleteMany({ where: { email: { in: mockEmails } } });
 
   await prisma.user.createMany({
     data: [

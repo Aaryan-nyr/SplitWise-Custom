@@ -19,14 +19,45 @@ export function Board({ initialTasks, assignees }: { initialTasks: Task[]; assig
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isPopUpOpen, setIsPopUpOpen] = useState(false);
+  const [mode, setMode] = useState<"create" | "edit">("edit");
+
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
     setIsPopUpOpen(true);
+    setMode("edit");
   };
 
-  async function updateTask(updatedTask: Task) {
-    const response = await fetch(`/api/todos/${updatedTask.id}`, {
+  // when a Add task is clicked; set the selected task to a new empty task and open the popup in create mode
+  const handleAddTask = () => {
+    const newEmptyTask: Task = {
+      id: crypto.randomUUID(),
+      title: "",
+      description: "",
+      status: "TODO",
+      priority: "MEDIUM",
+      assignedToId: null,
+      assignedTo: "Unassigned",
+      createdBy: "ME", 
+      assignee: "ME",
+      lastEditedBy: "ME",
+      updatedAt: new Date(),
+      comments: []
+    }
+
+    setSelectedTask(newEmptyTask);
+    setIsPopUpOpen(true);
+    setMode("create");
+    setIsPopUpOpen(true);
+  }
+
+  async function handleTaskSave(updatedTask: Task, mode: "create" | "edit") {
+    if (mode === "create") {
+      // Create a new task
+      
+    }
+    else {
+      const response = await fetch(`/api/todos/${updatedTask.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -36,6 +67,7 @@ export function Board({ initialTasks, assignees }: { initialTasks: Task[]; assig
         priority: updatedTask.priority,
         assignedToId: updatedTask.assignedToId,
       }),
+      
     });
 
     const result = await response.json() as Task | { error?: string };
@@ -45,6 +77,7 @@ export function Board({ initialTasks, assignees }: { initialTasks: Task[]; assig
 
     setTasks((currentTasks) => currentTasks.map((task) => task.id === result.id ? result : task));
     setSelectedTask(result);
+    }
   }
 
   function moveDraggedTask(status: BoardStatus) {
@@ -79,12 +112,12 @@ export function Board({ initialTasks, assignees }: { initialTasks: Task[]; assig
           <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Weekly ToDos</h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">Keep the small things moving, together.</p>
         </div>
-        <Button onClick={() => addTask()} className="gap-2 self-start sm:self-auto"><Plus aria-hidden="true" />Add card</Button>
+        <Button onClick={() => handleAddTask()} className="gap-2 self-start sm:self-auto"><Plus aria-hidden="true" />Add Task</Button>
       </div>
       <div className="grid gap-4 overflow-x-auto pb-4 xl:grid-cols-4">
         {statuses.map((status) => <BoardColumn key={status} status={status} tasks={tasks.filter((task) => task.status === status)} onDragStart={setDraggedTaskId} onDrop={moveDraggedTask} onTaskSelect={handleTaskClick} onAddTask={() => addTask(status)} />)}
       </div>
-      {isPopUpOpen && selectedTask && <TaskDetailCard task={selectedTask} assignees={assignees} onClose={() => setIsPopUpOpen(false)} onSave={updateTask} />}
+      {isPopUpOpen && selectedTask && <TaskDetailCard task={selectedTask} mode={mode} assignees={assignees} onClose={() => setIsPopUpOpen(false)} onSave={handleTaskSave} />}
     </section>
   );
 }
