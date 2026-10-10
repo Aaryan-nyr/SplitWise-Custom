@@ -13,6 +13,12 @@ const householdId = "mock-household";
 const listId = "mock-todolist";
 const mockEmails = ["alice.mock@example.com", "jordan.mock@example.com"];
 
+const developerUser = {
+  id: "test-user",
+  name: "Test User",
+  email: "aaryannayar1@gmail.com"
+};
+
 async function main() {
   await prisma.taskComment.deleteMany({
     where: { todoItem: { list: { title: "Weekly ToDos" } } },
@@ -32,11 +38,17 @@ async function main() {
     ],
   });
 
+  const seededDeveloperUser = await prisma.user.upsert({
+    where: { email: developerUser.email },
+    update: { name: developerUser.name },
+    create: developerUser,
+  });
+
   await prisma.household.create({
     data: {
       id: householdId,
       name: "Mock Household",
-      members: { create: [{ userId: aliceId }, { userId: jordanId }] },
+      members: { create: [{ userId: aliceId }, { userId: jordanId }, { userId: seededDeveloperUser.id }] },
       todoLists: {
         create: {
           id: listId,

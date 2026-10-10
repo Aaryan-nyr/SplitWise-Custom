@@ -26,23 +26,28 @@ function formatDate(date: Date) {
   });
 }
 
-export function TaskDetailCard({ task, assignees, onClose, onSave }: TaskDetailCardProps) {
-  const [isEditing, setIsEditing] = useState(false);
+export function TaskDetailCard({ task, mode, assignees, onClose, onSave }: TaskDetailCardProps) {
+  // set the isEditing directly here
+  // calling the state setters later causes a re-render which triggers another render leading to infinite loop
+  const [isEditing, setIsEditing] = useState(mode === "create");
   const [isConfirming, setIsConfirming] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [draft, setDraft] = useState(task);
+  var buttonLabel = mode === "create" ? "Create task" : "Save changes";
+  
+  // mode === "create" ? setIsEditing(true) : setIsEditing(false);
 
   function updateDraft(field: keyof Task, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
   }
-
+  
   async function saveTask() {
     setIsSaving(true);
     setSaveError(null);
 
     try {
-      await onSave(draft);
+      await onSave(draft, mode);
       setIsConfirming(false);
       setIsEditing(false);
     } catch (error) {
@@ -127,7 +132,7 @@ export function TaskDetailCard({ task, assignees, onClose, onSave }: TaskDetailC
             {isEditing ? (
               <>
                 <Button variant="ghost" onClick={() => { setDraft(task); setIsEditing(false); }}>Cancel</Button>
-                <Button onClick={() => setIsConfirming(true)} disabled={!draft.title.trim()}>Save changes</Button>
+                <Button onClick={() => setIsConfirming(true)} disabled={!draft.title.trim()}>{buttonLabel}</Button>
               </>
             ) : <Button onClick={() => setIsEditing(true)} className="gap-2"><Pencil aria-hidden="true" />Edit</Button>}
           </div>

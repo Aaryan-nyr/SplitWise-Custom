@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,8 +14,31 @@ const statuses: BoardStatus[] = ["TODO", "INPROGRESS", "DONE", "OBSOLETE"];
 
 type Assignee = { id: string; name: string };
 
-export function Board({ initialTasks, assignees }: { initialTasks: Task[]; assignees: Assignee[] }) {
-  const [tasks, setTasks] = useState(initialTasks);
+export function Board({ currentListId, assignees }: { currentListId: string; assignees: Assignee[] }) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  
+  // invoke when currentListId changes; fetch tasks from the API
+  useEffect(() => {
+    async function fetchTasks() {
+      if (!currentListId) {
+        setTasks([]);
+        return;
+      }
+
+      const response = await fetch(`/api/todos?list=${currentListId}`);
+      if (!response.ok) {
+        setTasks([]);
+        return;
+      }
+      // parse the response as JSON and set the tasks state
+      const data = await response.json();
+      const nextTasks = Array.isArray(data) ? data : data.tasks ?? [];
+      setTasks(nextTasks);
+    }
+
+    fetchTasks();
+  }, [currentListId]);
+
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -38,7 +62,7 @@ export function Board({ initialTasks, assignees }: { initialTasks: Task[]; assig
       priority: "MEDIUM",
       assignedToId: null,
       assignedTo: "Unassigned",
-      createdBy: "ME", 
+      createdBy: "ME",
       assignee: "ME",
       lastEditedBy: "ME",
       updatedAt: new Date(),
@@ -51,21 +75,40 @@ export function Board({ initialTasks, assignees }: { initialTasks: Task[]; assig
     setIsPopUpOpen(true);
   }
 
-  async function handleTaskSave(updatedTask: Task, mode: "create" | "edit") {
+  async function handleTaskSave(task: Task, mode: "create" | "edit") {
     if (mode === "create") {
       // Create a new task
+      const response = await fetch(`/api/todos?list=${currentListId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: task.title,
+          description: task.description,
+          status: task.status,
+          priority: task.priority,
+          assignedToId: task.assignedToId,
+        }),
+      });
+
+      const result = await response.json() as Task | { error?: string };
+      if (!response.ok || !("id" in result)) {
+        throw new Error("error" in result ? result.error : "The task could not be created.");
+      }
+
+      setTasks((currentTasks) => [...currentTasks, result]);
+      setSelectedTask(result);
       
     }
     else {
-      const response = await fetch(`/api/todos/${updatedTask.id}`, {
+      const response = await fetch(`/api/todos/${task.id}?list=${currentListId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        title: updatedTask.title,
-        description: updatedTask.description,
-        status: updatedTask.status,
-        priority: updatedTask.priority,
-        assignedToId: updatedTask.assignedToId,
+        title: task .title,
+        description: task.description,
+        status: task.status,
+        priority: task.priority,
+        assignedToId: task.assignedToId,
       }),
       
     });
