@@ -1,81 +1,17 @@
 import { NextResponse } from "next/server";
-
+import { validateUserSession, validateTodoInput, validateListId } from "@/app/lib/auth-helpers";
 import { prisma } from "@/app/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/auth";
-
-const statuses = ["TODO", "INPROGRESS", "DONE", "OBSOLETE"] as const;
-const priorities = ["LOW", "MEDIUM", "HIGH"] as const;
-
-type NewTodoBody = {
-  title?: unknown;
-  description?: unknown;
-  status?: unknown;
-  priority?: unknown;
-  assignedToId?: unknown;
-  updatedAt?: unknown;
-}
-
-type TodoInput = {
-  title?: unknown;
-  description?: unknown;
-  status?: unknown;
-  priority?: unknown;
-  assignedToId?: unknown;
-  updatedAt?: unknown;
-};
-
-
-type ValidatedTodoInput = {
-  title: string;
-  description: string | null;
-  status: typeof statuses[number];
-  priority: typeof priorities[number];
-  assignedToId: string | null;
-}
-
-function validateListId(listId: unknown): asserts listId is string {
-  if (typeof listId !== "string" || !listId.trim()) {
-    throw new Error("A valid listId is required.");
-  }
-}
-
-function validateTodoInput(body: TodoInput, mode: "create" | "update" = "update"): ValidatedTodoInput {
-  if (typeof body.title !== "string" || !body.title.trim()) {
-    throw new Error("A title is required.");
-  }
-
-  if (body.description !== null && body.description !== undefined && typeof body.description !== "string") {
-    throw new Error("Description must be text or null.");
-  }
-
-  if (!statuses.includes(body.status as typeof statuses[number])) {
-    throw new Error("Invalid task status.");
-  }
-
-  if (!priorities.includes(body.priority as typeof priorities[number])) {
-    throw new Error("Invalid task priority.");
-  }
-  
-  if (mode === "create" && body.updatedAt !== undefined) {
-    throw new Error("UpdatedAt should not be provided when creating a task.");
-  }
-
-  const assignedToId =
-    body.assignedToId === "" || body.assignedToId === undefined ? null : body.assignedToId;
-
-  if (assignedToId !== null && typeof assignedToId !== "string") {
-    throw new Error("Assignee must be a household member or null.");
-  }
-
-  return {
-    title: body.title.trim(),
-    description: body.description === null ? null : body.description ?? null,
-    status: body.status as typeof statuses[number],
-    priority: body.priority as typeof priorities[number],
-    assignedToId,
-  };
-}
+import {
+  TASK_STATUSES,
+  TASK_PRIORITIES,
+  type TaskStatus,
+  type TaskPriority,
+  type ValidatedTodoInput,
+  type TodoInput,
+  type NewTodoBody,
+} from "@/app/lib/task-constants";
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -130,10 +66,7 @@ export async function POST(request: Request) {
     const listId = searchParams.get("list") as string | undefined;
     validateListId(listId);
 
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user || !session.user.id) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const session = await validateUserSession();
 
     const body = await request.json() as NewTodoBody;
     let validatedInput: ValidatedTodoInput;

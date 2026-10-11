@@ -1,17 +1,9 @@
 import { Board } from "./components/board/board";
+import { Sidebar } from "./components/sidebar";
 import { prisma } from "./lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "./auth";
 import { redirect } from "next/navigation";
-
-
-function initials(name: string | null, email: string) {
-  if (name) {
-    return name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
-  }
-
-  return email.slice(0, 2).toUpperCase();
-}
 
 export default async function Home({searchParams,}: {
   searchParams?: Promise<{ list?: string }> | { list?: string };
@@ -64,16 +56,20 @@ export default async function Home({searchParams,}: {
     : null;
 
   return (
-    <main className="min-h-screen bg-[#f7f9fc] px-4 py-6 sm:px-8 sm:py-10">
-      <div className="mx-auto max-w-[1500px]">
-        <Board
-          currentListId={list?.id ?? ""}
-          assignees={list?.household.members.map(({ user }) => ({
-            id: user.id,
-            name: user.name ?? user.email,
-          })) ?? []}
-        />
-      </div>
-    </main>
+    <div className="flex min-h-screen bg-[#f7f9fc]">
+      <Sidebar />
+
+      <main className="flex-1 px-4 py-6 sm:px-8 sm:py-10">
+        <div className="mx-auto max-w-[1500px]">
+          <Board
+            currentListId={list?.id ?? ""}
+            assignees={list?.household.members.map(({ user }) => ({
+              id: user.id,
+              name: user.name ?? user.email,
+            })) ?? []}
+          />
+        </div>
+      </main>
+    </div>
   );
 }

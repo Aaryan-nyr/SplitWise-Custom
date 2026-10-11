@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { BoardColumn } from "./board-column";
 import { TaskDetailCard } from "./task-detail-card";
 import { BoardStatus, Task } from "./task-card";
+import { Navbar } from "../navbar";
+
 
 const statuses: BoardStatus[] = ["TODO", "INPROGRESS", "DONE", "OBSOLETE"];
 
@@ -149,18 +151,17 @@ export function Board({ currentListId, assignees }: { currentListId: string; ass
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="mb-2 text-xs font-semibold tracking-[0.18em] text-sky-600 uppercase">Household workspace</p>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Weekly ToDos</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">Keep the small things moving, together.</p>
-        </div>
-        <Button onClick={() => handleAddTask()} className="gap-2 self-start sm:self-auto"><Plus aria-hidden="true" />Add Task</Button>
+      <div className="flex flex-row justify gap-4 sm:flex-row sm:items-end">
+        <Navbar />
       </div>
+        <Button onClick={() => handleAddTask()} className="gap-2 self-start sm:self-auto"><Plus aria-hidden="true" />Add Task</Button>
       <div className="grid gap-4 overflow-x-auto pb-4 xl:grid-cols-4">
         {statuses.map((status) => <BoardColumn key={status} status={status} tasks={tasks.filter((task) => task.status === status)} onDragStart={setDraggedTaskId} onDrop={moveDraggedTask} onTaskSelect={handleTaskClick} onAddTask={() => addTask(status)} />)}
       </div>
-      {isPopUpOpen && selectedTask && <TaskDetailCard task={selectedTask} mode={mode} assignees={assignees} onClose={() => setIsPopUpOpen(false)} onSave={handleTaskSave} />}
+      {isPopUpOpen && selectedTask && <TaskDetailCard task={selectedTask} mode={mode} assignees={assignees} onClose={() => setIsPopUpOpen(false)} onSave={handleTaskSave} onDeleteSuccess={
+        (selectedTask) => {setIsPopUpOpen(false)
+        setTasks((currentTasks) => currentTasks.filter((task) => task.id !== selectedTask.id))
+      }} />}
     </section>
   );
 }

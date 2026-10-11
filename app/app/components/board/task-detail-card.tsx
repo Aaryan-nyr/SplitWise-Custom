@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, LoaderCircle, Pencil, X } from "lucide-react";
+import { Check, Delete, LoaderCircle, Pencil, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ type TaskDetailCardProps = {
   assignees: { id: string; name: string }[];
   onClose: () => void;
   onSave: (task: Task, mode: "create" | "edit") => Promise<void>;
+  onDeleteSuccess: (task: Task) => void;
 };
 
 const statuses: BoardStatus[] = ["TODO", "INPROGRESS", "DONE", "OBSOLETE"];
@@ -26,13 +27,16 @@ function formatDate(date: Date) {
   });
 }
 
-export function TaskDetailCard({ task, mode, assignees, onClose, onSave }: TaskDetailCardProps) {
+export function TaskDetailCard({ task, mode, assignees, onClose, onSave, onDeleteSuccess }: TaskDetailCardProps) {
   // set the isEditing directly here
   // calling the state setters later causes a re-render which triggers another render leading to infinite loop
   const [isEditing, setIsEditing] = useState(mode === "create");
   const [isConfirming, setIsConfirming] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [draft, setDraft] = useState(task);
   var buttonLabel = mode === "create" ? "Create task" : "Save changes";
   
@@ -56,7 +60,24 @@ export function TaskDetailCard({ task, mode, assignees, onClose, onSave }: TaskD
       setIsSaving(false);
     }
   }
+ async function handleTaskDelete() {
+    setConfirmDelete(true);
+    setDeleteError(null);
 
+    try{
+       const response = await fetch(`/api/todos/${task.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to delete the task.");
+      }
+      onClose();
+      onDeleteSuccess(task);
+    }
+      catch (error) {
+        setDeleteError(error instanceof Error ? error.message : "The task could not be deleted.");
+      }
+  }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="presentation" onMouseDown={onClose}>
       <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="task-detail-title" onMouseDown={(event) => event.stopPropagation()}>
@@ -129,6 +150,21 @@ export function TaskDetailCard({ task, mode, assignees, onClose, onSave }: TaskD
           )}
           {/* set state to when editing or confirming changes */}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+              {isDeleting ? (
+                <>
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/35 p-4" role="presentation">
+                <Card className="w-full max-w-md border-slate-200 bg-white shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="confirm-task-title" onMouseDown={(event) => event.stopPropagation()}>
+                <CardHeader className="px-6 py-5"><CardTitle id="confirm-task-title" className="text-lg font-bold text-slate-950">Delete this task?</CardTitle></CardHeader>
+                <CardContent className="space-y-5 px-6 pb-6">
+                  <p className="text-sm leading-6 text-slate-600">This will permanently delete the task from the board.</p>
+                  {deleteError &&
+                   <p className="text-sm text-rose-600" role="alert">{deleteError}</p>}
+                   <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setIsDeleting(false)} disabled={isConfirming}>Cancel Delete</Button><Button onClick={handleTaskDelete} disabled={isConfirming} className="gap-2">{confirmDelete && !deleteError ? <><LoaderCircle className="animate-spin" aria-hidden="true" />Deleting...</> : <><Check aria-hidden="true" />Confirm delete</>}</Button></div></CardContent>
+              </Card>
+              </div>
+              </>
+            ) : mode !== "create" && <Button variant="destructive" onClick={() => setIsDeleting(true)} title="Delete Task" className="gap-2"><Trash2 aria-hidden="true" />Delete</Button>
+            }
             {isEditing ? (
               <>
                 <Button variant="ghost" onClick={() => { setDraft(task); setIsEditing(false); }}>Cancel</Button>
