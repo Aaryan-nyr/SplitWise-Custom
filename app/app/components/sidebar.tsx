@@ -17,21 +17,22 @@ export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <aside className={`shrink-0 border-r border-slate-200 bg-white/90 backdrop-blur-sm transition-[width] duration-200 ${isCollapsed ? "w-16" : "w-64"}`}>
-      <div className={`flex h-full flex-col p-3 ${isCollapsed ? "items-center" : ""}`}>
-        <div className={`mb-6 flex w-full items-center ${isCollapsed ? "flex-col gap-3" : "justify-between px-1"}`}>
-          {!isCollapsed && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">
-                Household
-              </p>
-              <h1 className="mt-2 text-xl font-bold text-slate-900">Split</h1>
-            </div>
-          )}
+    <aside
+      className={`w-full shrink-0 border-b border-slate-200 bg-white/90 backdrop-blur-sm min-[431px]:border-r min-[431px]:border-b-0 min-[431px]:transition-[width] min-[431px]:duration-200 ${isCollapsed ? "min-[431px]:w-16" : "min-[431px]:w-64"}`}
+    >
+      <div className={`flex h-auto flex-col gap-3 p-3 min-[431px]:h-full ${isCollapsed ? "min-[431px]:items-center" : ""}`}>
+        <div className={`flex w-full items-center justify-between gap-3 px-1 min-[431px]:mb-6 ${isCollapsed ? "min-[431px]:flex-col min-[431px]:gap-3" : ""}`}>
+          <div className={isCollapsed ? "min-[431px]:hidden" : ""}>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">
+              Household
+            </p>
+            <h1 className="mt-1 text-xl font-bold text-slate-900">Split</h1>
+          </div>
           <Button
             type="button"
             variant="ghost"
             size="icon"
+            className="hidden min-[431px]:inline-flex"
             onClick={() => setIsCollapsed((collapsed) => !collapsed)}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             aria-expanded={!isCollapsed}
@@ -41,7 +42,7 @@ export function Sidebar() {
           </Button>
         </div>
 
-        <nav className="w-full space-y-2">
+        <nav className="flex w-full gap-2 min-[431px]:flex-col min-[431px]:space-y-2">
           {links.map(({ href, label, icon: Icon }) => {
             const isActive =
               href === "/"
@@ -52,17 +53,17 @@ export function Sidebar() {
               <Link
                 key={href}
                 href={href}
+                aria-current={isActive ? "page" : undefined}
                 className={[
-                  "flex items-center rounded-xl py-2.5 text-sm font-medium transition-colors",
-                  isCollapsed ? "justify-center px-0" : "gap-3 px-3",
+                  "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors min-[431px]:flex-row min-[431px]:flex-none min-[431px]:justify-start min-[431px]:gap-3 min-[431px]:px-3 min-[431px]:py-2.5 min-[431px]:text-sm",
+                  isCollapsed ? "min-[431px]:justify-center min-[431px]:px-0" : "",
                   isActive
                     ? "bg-sky-50 text-sky-700 ring-1 ring-sky-200"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
                 ].join(" ")}
               >
                 <Icon className="h-4 w-4" aria-hidden="true" />
-                {!isCollapsed && <span>{label}</span>}
-                {isCollapsed && <span className="sr-only">{label}</span>}
+                <span className={isCollapsed ? "min-[431px]:sr-only" : ""}>{label}</span>
               </Link>
             );
           })}

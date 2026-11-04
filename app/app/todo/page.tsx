@@ -54,7 +54,7 @@ export default async function TodoPage({
     : null;
 
   return (
-    <div className="flex min-h-screen bg-[#f7f9fc]">
+    <div className="flex min-h-screen flex-col bg-[#f7f9fc] min-[431px]:flex-row">
       <Sidebar />
 
       <main className="flex-1 px-4 py-6 sm:px-8 sm:py-10">

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Wallet, PlusCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { LoaderCircle, PlusCircle, Wallet } from "lucide-react";
 
 const initialForm = {
   description: "",
@@ -10,29 +11,70 @@ const initialForm = {
   paidBy: "",
   date: new Date().toISOString().slice(0, 10),
 };
-// MVP
-// page shoudl be restructured
-// essentially shows the previous expenses
-// then add expense similiar to the todos
-// maybe the top of the page shows a summary; who owes / owed
 
-// enhancement: most frequent payer / adder
-// enhancement: categorize expenses by category; show a pie chart of the distribution of expenses by category
-// enhancement: create groups
+type HouseholdMember = {
+  id: string;
+  name: string;
+};
 
-export function ExpenseForm() {
-  const [form, setForm] = useState(initialForm);
+export function ExpenseForm({
+  householdMembers,
+  currentUserId,
+}: {
+  householdMembers: HouseholdMember[];
+  currentUserId: string;
+}) {
+  const router = useRouter();
+  const defaultPayerId =
+    householdMembers.find((member) => member.id === currentUserId)?.id ??
+    householdMembers[0]?.id ??
+    "";
+
+  const [form, setForm] = useState({
+    ...initialForm,
+    paidBy: defaultPayerId,
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function handleChange(field: keyof typeof initialForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    alert(
-      `Expense saved: ${form.description} - $${form.amount} (${form.category})`
-    );
-    setForm(initialForm);
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.description,
+          amount: form.amount,
+          category: form.category,
+          paidById: form.paidBy,
+          expenseDate: form.date,
+        }),
+      });
+
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error ?? "The expense could not be saved.");
+      }
+
+      router.push("/expenses");
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "The expense could not be saved. Please try again."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -45,7 +87,7 @@ export function ExpenseForm() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">
             Household
           </p>
-          <h1 className="text-2xl font-bold text-slate-900">Expenses</h1>
+          <h2 className="text-2xl font-bold text-slate-900">Add an expense</h2>
         </div>
       </div>
 
@@ -53,8 +95,8 @@ export function ExpenseForm() {
         onSubmit={handleSubmit}
         className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
       >
-        <div className="grid gap-5 sm:grid-cols-2">
-          <label className="space-y-2 text-sm font-medium text-slate-700 sm:col-span-2">
+        <div className="flex flex-col gap-5">
+          <label className="space-y-2 text-sm font-medium text-slate-700">
             <span>Description</span>
             <input
               value={form.description}
@@ -69,7 +111,7 @@ export function ExpenseForm() {
             <span>Amount</span>
             <input
               type="number"
-              min="0"
+              min="0.01"
               step="0.01"
               value={form.amount}
               onChange={(event) => handleChange("amount", event.target.value)}
@@ -97,19 +139,29 @@ export function ExpenseForm() {
 
           <label className="space-y-2 text-sm font-medium text-slate-700">
             <span>Paid by</span>
-            <input
+            <select
               value={form.paidBy}
               onChange={(event) => handleChange("paidBy", event.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-              placeholder="Alex"
-            />
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              required
+            >
+              {householdMembers.length === 0 ? (
+                <option value="">No household members found</option>
+              ) : (
+                householdMembers.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
+                  </option>
+                ))
+              )}
+            </select>
           </label>
 
-          <label className="space-y-2 text-sm font-medium text-slate-700 sm:col-span-2">
+          <label className="space-y-2 text-sm font-medium text-slate-700">
             <span>Date</span>
             <input
-              type="date"
               value={form.date}
+              type="date"
               onChange={(event) => handleChange("date", event.target.value)}
               className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
               required
@@ -117,13 +169,24 @@ export function ExpenseForm() {
           </label>
         </div>
 
+        {error && (
+          <p className="mt-4 text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        )}
+
         <div className="mt-6 flex justify-end">
           <button
             type="submit"
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"
+            disabled={isSaving || householdMembers.length === 0}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <PlusCircle className="h-4 w-4" aria-hidden="true" />
-            Add expense
+            {isSaving ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <PlusCircle className="h-4 w-4" aria-hidden="true" />
+            )}
+            {isSaving ? "Saving..." : "Add expense"}
           </button>
         </div>
       </form>

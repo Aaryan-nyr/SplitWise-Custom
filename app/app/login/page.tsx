@@ -13,7 +13,15 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      await signIn("google", { callbackUrl: "/" });
+      const requestedCallbackUrl = new URLSearchParams(window.location.search).get(
+        "callbackUrl"
+      );
+      const callbackUrl =
+        requestedCallbackUrl &&
+        /^\/join\/[A-Za-z0-9_-]{43}$/.test(requestedCallbackUrl)
+          ? requestedCallbackUrl
+          : "/";
+      await signIn("google", { callbackUrl });
     } catch {
       setIsSigningIn(false);
       setError("We couldn't start sign-in. Please try again.");
@@ -56,7 +64,7 @@ export default function LoginPage() {
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
                   <Check size={16} strokeWidth={2.5} aria-hidden="true" />
                 </span>
-                One clear view of what's next
+                One clear view of what&apos;s next
               </div>
             </div>
           </div>
