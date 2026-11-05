@@ -25,6 +25,7 @@ export async function POST(
   }
 
   const result = await prisma.$transaction(async (transaction) => {
+    //validate invite link; expires after 1 day
     const invite = await transaction.householdInvite.findUnique({
       where: { tokenHash: hashHouseholdInviteToken(token) },
       select: { id: true, householdId: true, expiresAt: true, acceptedAt: true },
@@ -34,21 +35,15 @@ export async function POST(
       return { status: 404, error: "This invite link is invalid." };
     }
 
-    const existingMembership = await transaction.householdMember.findFirst({
-      where: { userId },
-      orderBy: { joinedAt: "asc" },
+    const existingMembership = await transaction.householdMember.findUnique({
+      where: {
+        householdId_userId: { householdId: invite.householdId, userId },
+      },
       select: { householdId: true },
     });
 
-    if (existingMembership?.householdId === invite.householdId) {
-      return { status: 200, householdId: invite.householdId };
-    }
-
     if (existingMembership) {
-      return {
-        status: 409,
-        error: "Your account already belongs to another household.",
-      };
+      return { status: 200, redirectTo: "/login" };
     }
 
     const now = new Date();
@@ -71,6 +66,10 @@ export async function POST(
 
     return { status: 200, householdId: invite.householdId };
   });
+
+  if ("redirectTo" in result) {
+    return NextResponse.json({ redirectTo: result.redirectTo }, { status: result.status });
+  }
 
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: result.status });

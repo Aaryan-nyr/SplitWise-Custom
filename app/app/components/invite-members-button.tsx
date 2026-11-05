@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy, LoaderCircle, UserPlus } from "lucide-react";
-
+// does not work yet; invite results in json error
 export function InviteMembersButton() {
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);

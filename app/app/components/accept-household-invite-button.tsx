@@ -17,13 +17,15 @@ export function AcceptHouseholdInviteButton({ token }: { token: string }) {
       const response = await fetch(`/api/household-invites/${token}/accept`, {
         method: "POST",
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as {
+        error?: string;
+        redirectTo?: string;
+      };
 
       if (!response.ok) {
         throw new Error(result.error ?? "We couldn't join this household.");
       }
-      router.replace("/");
-      router.replace("/");
+      router.replace(result.redirectTo ?? "/");
     } catch (caughtError) {
       setError(
         caughtError instanceof Error

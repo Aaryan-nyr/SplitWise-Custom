@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const HOUSEHOLD_INVITE_VALIDITY_DAYS = 7;
+export const HOUSEHOLD_INVITE_VALIDITY_DAYS = 1;
 
 export function hashHouseholdInviteToken(token: string) {
   return createHash("sha256").update(token).digest("hex");

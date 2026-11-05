@@ -35,14 +35,20 @@ export default async function JoinHouseholdPage({
       })
     : null;
 
-  const membership = await prisma.householdMember.findFirst({
-    where: { userId: session.user.id },
-    orderBy: { joinedAt: "asc" },
-    select: { householdId: true },
-  });
+  const membership = invitation
+    ? await prisma.householdMember.findUnique({
+        where: {
+          householdId_userId: {
+            householdId: invitation.householdId,
+            userId: session.user.id,
+          },
+        },
+        select: { householdId: true },
+      })
+    : null;
 
   if (invitation && membership?.householdId === invitation.householdId) {
-    redirect("/");
+    redirect("/login");
   }
 
   const inviteIsValid =
@@ -72,14 +78,7 @@ export default async function JoinHouseholdPage({
               Join this household to share its tasks and expenses.
             </p>
             <div className="mt-7">
-              {membership ? (
-                <p className="rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-800">
-                  Your account already belongs to another household and cannot join
-                  this one.
-                </p>
-              ) : (
-                <AcceptHouseholdInviteButton token={token} />
-              )}
+              <AcceptHouseholdInviteButton token={token} />
             </div>
           </>
         ) : (
