@@ -1,9 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { ArrowRight, BarChart3, Receipt, UserRound } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { ExpenseCard } from "../components/expense-card";
 import { Sidebar } from "../components/sidebar";
+import { AppTopBar } from "../components/app-top-bar";
 import { prisma } from "../lib/prisma";
 import { validateUserSession } from "../lib/auth-helpers";
 
@@ -33,6 +35,10 @@ export default async function ExpensesPage() {
     orderBy: { joinedAt: "asc" },
     select: { householdId: true },
   });
+
+  if (!membership) {
+    redirect("/");
+  }
 
   const householdMembers = membership
     ? await prisma.householdMember.findMany({
@@ -128,36 +134,39 @@ export default async function ExpensesPage() {
   const latestExpenses = expenses.slice(0, 10);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f7f9fc] min-[431px]:flex-row">
+    <div className="flex min-h-screen flex-col bg-[#f7f9fc] md:flex-row">
       <Sidebar />
 
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-10">
+        <AppTopBar userName={session.user.name} userImage={session.user.image} />
         <div className="mx-auto max-w-[1500px] space-y-8">
-          <header>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">
-              Household
-            </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
-              Expenses
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              See how your household spending is shared over time.
-            </p>
+          <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">
+                Household
+              </p>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+                Expenses
+              </h1>
+              <p className="mt-2 text-sm text-slate-600">
+                See how your household spending is shared over time.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Link
+                href="/e"
+                className="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              >
+                Add expense
+              </Link>
+              <Link
+                href="/expenses-detailed"
+                className="inline-flex h-10 items-center rounded-xl border border-emerald-200 bg-white px-4 text-sm font-semibold text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              >
+                Monthly Breakdowns
+              </Link>
+            </div>
           </header>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/e"
-              className="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-            >
-              Add expense
-            </Link>
-            <Link
-              href="/expenses-detailed"
-              className="inline-flex items-center rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-            >
-              Monthly Breakdowns
-            </Link>
-          </div>
 
           <section aria-label="All-time expense summary" className="grid gap-4 md:grid-cols-3">
             <article className="rounded-2xl bg-slate-950 p-6 text-white shadow-sm">
@@ -216,7 +225,16 @@ export default async function ExpensesPage() {
                 Last 10 expenses
               </h2>
             </div>
-            {latestExpenses.length === 0 ? (
+            {expenses.length === 0 ? (
+              <div className="rounded-xl bg-slate-50 px-4 py-8 text-center">
+                <h3 className="font-semibold text-slate-900">
+                  Begin your household management
+                </h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  Add your first expense to start tracking shared household spending.
+                </p>
+              </div>
+            ) : latestExpenses.length === 0 ? (
               <p className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
                 No expenses have been added yet.
               </p>

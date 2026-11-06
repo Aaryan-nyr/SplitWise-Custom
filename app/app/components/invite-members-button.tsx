@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy, LoaderCircle, UserPlus } from "lucide-react";
-// does not work yet; invite results in json error
+
 export function InviteMembersButton() {
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -65,7 +65,7 @@ export function InviteMembersButton() {
       {inviteUrl && (
         <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50 p-3">
           <p className="text-xs font-medium text-slate-700">
-            Share this link. It can be used once and expires in 7 days.
+            Share this one-time link. It expires in one day.
           </p>
           <p className="mt-2 break-all rounded-lg bg-white px-3 py-2 text-xs text-slate-600">
             {inviteUrl}

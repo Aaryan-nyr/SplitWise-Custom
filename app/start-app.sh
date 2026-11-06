@@ -17,7 +17,9 @@ for attempt in {1..30}; do
         process.exit(1);
       });
   '; then
-    echo "Database connection is ready; starting Next.js."
+    echo "Database connection is ready; applying pending migrations."
+    npx prisma migrate deploy
+    echo "Migrations are up to date; starting Next.js."
     exec npm start
   fi
 

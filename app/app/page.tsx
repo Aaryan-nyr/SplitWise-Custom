@@ -3,7 +3,9 @@ import { ArrowRight, CheckCircle2, Circle, Wallet } from "lucide-react";
 import Link from "next/link";
 
 import { InviteMembersButton } from "./components/invite-members-button";
+import { CreateHouseholdForm } from "./components/create-household-form";
 import { Sidebar } from "./components/sidebar";
+import { AppTopBar } from "./components/app-top-bar";
 import { prisma } from "./lib/prisma";
 import { validateUserSession } from "./lib/auth-helpers";
 
@@ -36,64 +38,91 @@ export default async function Home({
   const membership = await prisma.householdMember.findFirst({
     where: { userId: session.user.id },
     orderBy: { joinedAt: "asc" },
-    select: { householdId: true },
+    select: {
+      householdId: true,
+      household: { select: { name: true } },
+    },
   });
 
-  const [list, householdMembers, monthlyExpenses] = membership
-    ? await Promise.all([
-        prisma.todoList.findFirst({
-          where: {
-            householdId: membership.householdId,
-            ...(requestedListId ? { id: requestedListId } : {}),
-          },
-          orderBy: { createdAt: "asc" },
+  if (!membership) {
+    return (
+      <div className="flex min-h-screen flex-col bg-[#f7f9fc] md:flex-row">
+        <Sidebar />
+        <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-10">
+          <AppTopBar userName={session.user.name} userImage={session.user.image} />
+          <div className="mx-auto max-w-2xl space-y-6">
+            <header>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+                Welcome to Household Split
+              </p>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+                Start your household
+              </h1>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Create a household to keep shared to-dos and expenses together. Choose a
+                name first; inviting other members is optional and can be done now or later.
+              </p>
+            </header>
+            <CreateHouseholdForm />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const [list, householdMembers, monthlyExpenses] = await Promise.all([
+    prisma.todoList.findFirst({
+      where: {
+        householdId: membership.householdId,
+        ...(requestedListId ? { id: requestedListId } : {}),
+      },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        items: {
+          where: { status: { in: ["TODO", "INPROGRESS"] } },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
           select: {
             id: true,
-            items: {
-              where: { status: { in: ["TODO", "INPROGRESS"] } },
-              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-              select: {
-                id: true,
-                title: true,
-                description: true,
-                status: true,
-                priority: true,
-                assignedTo: { select: { name: true, email: true } },
-              },
-            },
+            title: true,
+            description: true,
+            status: true,
+            priority: true,
+            assignedTo: { select: { name: true, email: true } },
           },
-        }),
-        prisma.householdMember.findMany({
-          where: { householdId: membership.householdId },
-          orderBy: { joinedAt: "asc" },
+        },
+      },
+    }),
+    prisma.householdMember.findMany({
+      where: { householdId: membership.householdId },
+      orderBy: { joinedAt: "asc" },
+      select: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    }),
+    prisma.expense.findMany({
+      where: {
+        householdId: membership.householdId,
+        expenseDate: {
+          gte: monthStart,
+          lt: nextMonthStart,
+        },
+      },
+      orderBy: [{ expenseDate: "desc" }, { createdAt: "desc" }],
+      select: {
+        totalAmount: true,
+        paidById: true,
+        paidBy: { select: { id: true, name: true, email: true } },
+        splits: {
           select: {
+            userId: true,
+            amountOwed: true,
             user: { select: { id: true, name: true, email: true } },
           },
-        }),
-        prisma.expense.findMany({
-          where: {
-            householdId: membership.householdId,
-            expenseDate: {
-              gte: monthStart,
-              lt: nextMonthStart,
-            },
-          },
-          orderBy: [{ expenseDate: "desc" }, { createdAt: "desc" }],
-          select: {
-            totalAmount: true,
-            paidById: true,
-            paidBy: { select: { id: true, name: true, email: true } },
-            splits: {
-              select: {
-                userId: true,
-                amountOwed: true,
-                user: { select: { id: true, name: true, email: true } },
-              },
-            },
-          },
-        }),
-      ])
-    : [null, [], []];
+        },
+      },
+    }),
+  ]);
 
   const todoItems = list?.items ?? [];
   const toDoItems = todoItems.filter((item) => item.status === "TODO").slice(0, 2);
@@ -168,10 +197,11 @@ export default async function Home({
   }).format(now);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f7f9fc] min-[431px]:flex-row">
+    <div className="flex min-h-screen flex-col bg-[#f7f9fc] md:flex-row">
       <Sidebar />
 
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-10">
+        <AppTopBar userName={session.user.name} userImage={session.user.image} />
         <div className="mx-auto max-w-[1500px] space-y-7">
           <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -179,7 +209,7 @@ export default async function Home({
                 Household workspace
               </p>
               <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-                Your home, at a glance
+                {membership.household.name}
               </h1>
               <p className="mt-2 text-sm text-slate-600">
                 This month&apos;s expenses and the tasks you&apos;re working on.

@@ -125,17 +125,17 @@ export function ExpenseCard({
       <Card className="gap-0 border-black/8 bg-white shadow-none transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-md">
         <CardHeader className="flex flex-row items-start justify-between gap-3 px-4 pt-4 pb-2">
           <div className="min-w-0">
-            <CardTitle className="truncate text-sm leading-5 font-semibold text-slate-900">
+            <CardTitle className="truncate text-base leading-6 font-semibold text-slate-900">
               {expense.title}
             </CardTitle>
-            <p className="mt-1 text-xs text-slate-500">{expense.category}</p>
+            <p className="mt-1 text-sm text-slate-600">{expense.category}</p>
           </div>
-          <p className="shrink-0 text-sm font-bold text-slate-900">
+          <p className="shrink-0 text-base font-bold text-slate-900">
             {formatCurrency(expense.amount)}
           </p>
         </CardHeader>
         <CardContent className="space-y-4 px-4 pb-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
             <span>Paid by {expense.paidByName}</span>
             <time dateTime={expense.expenseDate}>
               {new Intl.DateTimeFormat("en-US", {
@@ -147,7 +147,7 @@ export function ExpenseCard({
             </time>
           </div>
           {expense.createdByName && (
-            <p className="text-xs text-slate-500">Added by {expense.createdByName}</p>
+            <p className="text-sm text-slate-600">Added by {expense.createdByName}</p>
           )}
           {expense.splits.length > 0 && (
             <p className="text-xs text-slate-500">

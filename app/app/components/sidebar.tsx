@@ -6,6 +6,8 @@ import { useState } from "react";
 import { Home, LayoutList, PanelLeftClose, PanelLeftOpen, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+import { SignOutButton } from "./sign-out-button";
+
 const links = [
   { href: "/", label: "Home", icon: Home },
   { href: "/todo", label: "Todo", icon: LayoutList },
@@ -18,11 +20,11 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`w-full shrink-0 border-b border-slate-200 bg-white/90 backdrop-blur-sm min-[431px]:border-r min-[431px]:border-b-0 min-[431px]:transition-[width] min-[431px]:duration-200 ${isCollapsed ? "min-[431px]:w-16" : "min-[431px]:w-64"}`}
+      className={`w-full shrink-0 border-b border-sky-200 bg-sky-100/90 backdrop-blur-sm md:border-r md:border-b-0 md:transition-[width] md:duration-200 ${isCollapsed ? "md:w-16" : "md:w-64"}`}
     >
-      <div className={`flex h-auto flex-col gap-3 p-3 min-[431px]:h-full ${isCollapsed ? "min-[431px]:items-center" : ""}`}>
-        <div className={`flex w-full items-center justify-between gap-3 px-1 min-[431px]:mb-6 ${isCollapsed ? "min-[431px]:flex-col min-[431px]:gap-3" : ""}`}>
-          <div className={isCollapsed ? "min-[431px]:hidden" : ""}>
+      <div className={`flex h-auto flex-col gap-3 p-3 md:h-full ${isCollapsed ? "md:items-center" : ""}`}>
+        <div className={`flex w-full items-center justify-between gap-3 px-1 md:mb-6 ${isCollapsed ? "md:flex-col md:gap-3" : ""}`}>
+          <div className={isCollapsed ? "md:hidden" : ""}>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">
               Household
             </p>
@@ -32,7 +34,7 @@ export function Sidebar() {
             type="button"
             variant="ghost"
             size="icon"
-            className="hidden min-[431px]:inline-flex"
+            className="hidden md:inline-flex"
             onClick={() => setIsCollapsed((collapsed) => !collapsed)}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             aria-expanded={!isCollapsed}
@@ -42,7 +44,7 @@ export function Sidebar() {
           </Button>
         </div>
 
-        <nav className="flex w-full gap-2 min-[431px]:flex-col min-[431px]:space-y-2">
+        <nav className="flex w-full gap-2 md:flex-col md:space-y-2">
           {links.map(({ href, label, icon: Icon }) => {
             const isActive =
               href === "/"
@@ -55,19 +57,24 @@ export function Sidebar() {
                 href={href}
                 aria-current={isActive ? "page" : undefined}
                 className={[
-                  "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors min-[431px]:flex-row min-[431px]:flex-none min-[431px]:justify-start min-[431px]:gap-3 min-[431px]:px-3 min-[431px]:py-2.5 min-[431px]:text-sm",
-                  isCollapsed ? "min-[431px]:justify-center min-[431px]:px-0" : "",
+                  "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors md:flex-row md:flex-none md:justify-start md:gap-3 md:px-3 md:py-2.5 md:text-sm",
+                  isCollapsed ? "md:justify-center md:px-0" : "",
                   isActive
-                    ? "bg-sky-50 text-sky-700 ring-1 ring-sky-200"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                    ? "bg-sky-700 text-white shadow-sm ring-1 ring-sky-800"
+                    : "text-slate-700 hover:bg-white/80 hover:text-sky-900",
                 ].join(" ")}
               >
                 <Icon className="h-4 w-4" aria-hidden="true" />
-                <span className={isCollapsed ? "min-[431px]:sr-only" : ""}>{label}</span>
+                <span className={isCollapsed ? "md:sr-only" : ""}>{label}</span>
               </Link>
             );
           })}
+          <SignOutButton
+            collapsed={isCollapsed}
+            className={`h-auto min-w-0 flex-1 flex-col gap-1 px-1 py-2 text-[11px] md:h-10 md:flex-none md:flex-row md:gap-3 md:px-3 md:py-2.5 md:text-sm ${isCollapsed ? "md:size-8 md:justify-center md:px-0 md:py-0" : ""}`}
+          />
         </nav>
+
       </div>
     </aside>
   );

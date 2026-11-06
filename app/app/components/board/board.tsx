@@ -55,12 +55,12 @@ export function Board({ currentListId, assignees }: { currentListId: string; ass
   };
 
   // when a Add task is clicked; set the selected task to a new empty task and open the popup in create mode
-  const handleAddTask = () => {
+  const handleAddTask = (status: BoardStatus = "TODO") => {
     const newEmptyTask: Task = {
       id: crypto.randomUUID(),
       title: "",
       description: "",
-      status: "TODO",
+      status,
       priority: "MEDIUM",
       assignedToId: null,
       assignedTo: "Unassigned",
@@ -72,7 +72,6 @@ export function Board({ currentListId, assignees }: { currentListId: string; ass
     }
 
     setSelectedTask(newEmptyTask);
-    setIsPopUpOpen(true);
     setMode("create");
     setIsPopUpOpen(true);
   }
@@ -131,32 +130,32 @@ export function Board({ currentListId, assignees }: { currentListId: string; ass
     setDraggedTaskId(null);
   }
 
-  function addTask(status: BoardStatus = "TODO") {
-    const title = window.prompt("Card title");
-    if (!title?.trim()) return;
-    setTasks((currentTasks) => [...currentTasks, {
-      id: crypto.randomUUID(),
-      title: title.trim(),
-      description: "New household task",
-      status,
-      priority: "MEDIUM",
-      assignee: "ME",
-      createdBy: "ME",
-      assignedTo: "ME",
-      assignedToId: null,
-      lastEditedBy: "ME",
-      updatedAt: new Date(),
-    }]);
-  }
-
   return (
     <section className="space-y-6">
-      <div className="flex flex-row justify gap-4 sm:flex-row sm:items-end">
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <Navbar />
-      </div>
-        <Button onClick={() => handleAddTask()} className="gap-2 self-start sm:self-auto"><Plus aria-hidden="true" />Add Task</Button>
-      <div className="grid gap-4 overflow-x-auto pb-4 xl:grid-cols-4">
-        {statuses.map((status) => <BoardColumn key={status} status={status} tasks={tasks.filter((task) => task.status === status)} onDragStart={setDraggedTaskId} onDrop={moveDraggedTask} onTaskSelect={handleTaskClick} onAddTask={() => addTask(status)} />)}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button
+            onClick={() => handleAddTask()}
+            className="h-10 gap-2 rounded-xl bg-sky-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-sky-800"
+          >
+            <Plus aria-hidden="true" />
+            Add Task
+          </Button>
+        </div>
+      </header>
+      {tasks.length === 0 && (
+        <div className="rounded-2xl border border-sky-100 bg-sky-50 px-5 py-6 text-center">
+          <h2 className="font-semibold text-slate-900">
+            Begin your household management
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Add your first to-do to start organizing your household together.
+          </p>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-4 pb-4 sm:grid-cols-2 xl:grid-cols-4">
+        {statuses.map((status) => <BoardColumn key={status} status={status} tasks={tasks.filter((task) => task.status === status)} onDragStart={setDraggedTaskId} onDrop={moveDraggedTask} onTaskSelect={handleTaskClick} onAddTask={() => handleAddTask(status)} />)}
       </div>
       {isPopUpOpen && selectedTask && <TaskDetailCard task={selectedTask} mode={mode} assignees={assignees} onClose={() => setIsPopUpOpen(false)} onSave={handleTaskSave} onDeleteSuccess={
         (selectedTask) => {setIsPopUpOpen(false)

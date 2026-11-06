@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { ExpenseForm } from "../components/expense-form";
 import { Sidebar } from "../components/sidebar";
+import { AppTopBar } from "../components/app-top-bar";
 import { validateUserSession } from "../lib/auth-helpers";
 import { prisma } from "../lib/prisma";
 
@@ -13,6 +15,10 @@ export default async function AddExpensePage() {
     orderBy: { joinedAt: "asc" },
     select: { householdId: true },
   });
+  if (!membership) {
+    redirect("/");
+  }
+
   const householdMembers = membership
     ? await prisma.householdMember.findMany({
         where: { householdId: membership.householdId },
@@ -27,10 +33,11 @@ export default async function AddExpensePage() {
     name: user.name ?? user.email,
   }));
   return (
-    <div className="flex min-h-screen flex-col bg-[#f7f9fc] min-[431px]:flex-row">
+    <div className="flex min-h-screen flex-col bg-[#f7f9fc] md:flex-row">
       <Sidebar />
 
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-10">
+        <AppTopBar userName={session.user.name} userImage={session.user.image} />
         <div className="mx-auto max-w-[1500px] space-y-6">
           <Link
             href="/expenses"

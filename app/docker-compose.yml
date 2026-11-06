@@ -1,16 +1,13 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: household-split-db
     restart: unless-stopped
-    env_file: 
-      - .env.local
     environment:
       - POSTGRES_DB=${DB_NAME}
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     ports:
-      - "5432:5432"
+      - "5431:5432"
     volumes:
       - household-split-db:/var/lib/postgresql/data
     healthcheck:
@@ -18,6 +15,23 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    mem_limit: 100m
+    cpus: 0.3
+
+  app:
+    build: .
+    image: household-split-app
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["bash", "./start-app.sh"]
 
 volumes:
   household-split-db:
