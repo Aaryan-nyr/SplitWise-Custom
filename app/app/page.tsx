@@ -7,7 +7,7 @@ import { CreateHouseholdForm } from "./components/create-household-form";
 import { Sidebar } from "./components/sidebar";
 import { AppTopBar } from "./components/app-top-bar";
 import { prisma } from "./lib/prisma";
-import { validateUserSession } from "./lib/auth-helpers";
+import { requirePageSession } from "./lib/auth-helpers";
 
 const priorityStyles = {
   LOW: "border-sky-200 bg-sky-50 text-sky-700",
@@ -27,7 +27,7 @@ export default async function Home({
 }: {
   searchParams?: Promise<{ list?: string }> | { list?: string };
 }) {
-  const session = await validateUserSession();
+  const session = await requirePageSession();
   const params = searchParams ? await searchParams : {};
   const requestedListId = params.list?.trim();
   const now = new Date();
@@ -35,6 +35,9 @@ export default async function Home({
   const nextMonthStart = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
   );
+
+  const currentUserId=await session.user.id;
+
   const membership = await prisma.householdMember.findFirst({
     where: { userId: session.user.id },
     orderBy: { joinedAt: "asc" },
@@ -190,6 +193,24 @@ export default async function Home({
 
   settlements.sort((a, b) => b.amount.comparedTo(a.amount));
 
+  const userBalanceItems = settlements
+    .filter(
+      (settlement) =>
+        settlement.debtor === session.user.id || settlement.creditor === session.user.id
+    )
+    .map((settlement) => {
+      const isDebtor = settlement.debtor === session.user.id;
+      const counterpartyId = isDebtor ? settlement.creditor : settlement.debtor;
+      const counterpartyName = memberNames.get(counterpartyId) ?? "Household member";
+
+      return {
+        key: `${settlement.debtor}-${settlement.creditor}`,
+        text: isDebtor
+          ? `You owe ${counterpartyName} ${formatCurrency(settlement.amount)}`
+          : `You are owed ${formatCurrency(settlement.amount)} from ${counterpartyName}`,
+      };
+    });
+
   const currentMonthLabel = new Intl.DateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
@@ -247,38 +268,27 @@ export default async function Home({
                 </div>
 
                 <div className="mt-6 border-t border-slate-100 pt-5">
-                  <h2 className="text-sm font-semibold text-slate-900">
-                    Who owes whom
+                  <h2 className="mb-3 text-base font-semibold text-slate-900">
+                    Your balances
                   </h2>
                   {monthlyExpenses.length === 0 ? (
-                    <p className="mt-3 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-slate-500">
                       No expenses have been added this month.
                     </p>
-                  ) : settlements.length === 0 ? (
-                    <p className="mt-3 text-sm text-slate-500">
+                  ) : userBalanceItems.length === 0 ? (
+                    <p className="mt-1 text-sm text-slate-500">
                       {expensesWithoutSplits > 0
                         ? "Owed amounts may be incomplete because some expenses have no recorded splits."
-                        : "No outstanding amounts between household members from recorded splits."}
+                        : "No outstanding amounts for you from recorded splits."}
                     </p>
                   ) : (
-                    <ul className="mt-3 space-y-2">
-                      {settlements.map((settlement, index) => (
+                    <ul className="mt-1 space-y-2.5">
+                      {userBalanceItems.map((item) => (
                         <li
-                          key={`${settlement.debtor}-${settlement.creditor}-${index}`}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-emerald-50/70 px-4 py-3 text-sm"
+                          key={item.key}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-emerald-50/70 px-4 py-3 text-base font-medium text-slate-800"
                         >
-                          <span className="text-slate-700">
-                            <strong className="font-semibold text-slate-900">
-                              {memberNames.get(settlement.debtor) ?? "Household member"}
-                            </strong>
-                            {" owes "}
-                            <strong className="font-semibold text-slate-900">
-                              {memberNames.get(settlement.creditor) ?? "Household member"}
-                            </strong>
-                          </span>
-                          <span className="font-bold text-emerald-800">
-                            {formatCurrency(settlement.amount)}
-                          </span>
+                          <span>{item.text}</span>
                         </li>
                       ))}
                     </ul>
