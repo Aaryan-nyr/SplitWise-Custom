@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
 import { validateTodoInput, validateUserSession } from "@/app/lib/auth-helpers";
 import { prisma } from "@/app/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/auth";
 
 import {
-  // TASK_STATUSES,
-  // TASK_PRIORITIES,
-  // type TaskStatus,
-  // type TaskPriority,
   type ValidatedTodoInput,
   type UpdateTodoBody,
 } from "@/app/lib/task-constants";
@@ -16,26 +10,37 @@ import {
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const session = await validateUserSession();
   const body = await request.json() as UpdateTodoBody;
-  
-  await validateUserSession();
 
-  var validatedInput = <ValidatedTodoInput>{};
+  let validatedInput: ValidatedTodoInput;
   try {
     validatedInput = validateTodoInput(body, "update");
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 400 });
   }
 
-  const updatedTodo = await prisma.todoItem.update({
-    where: { id },
+  const result = await prisma.todoItem.updateMany({
+    where: {
+      id,
+      list: { household: { members: { some: { userId: session.user.id } } } },
+    },
     data: {
       title: validatedInput.title,
       assignedToId: validatedInput.assignedToId,
       description: validatedInput.description,
       status: validatedInput.status,
       priority: validatedInput.priority,
+      lastEditedById: session.user.id,
     },
+  });
+
+  if (result.count === 0) {
+    return NextResponse.json({ error: "Task not found." }, { status: 404 });
+  }
+
+  const updatedTodo = await prisma.todoItem.findUniqueOrThrow({
+    where: { id },
     include: {
       assignedTo: true,
       createdBy: true,
@@ -72,12 +77,15 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   const session = await validateUserSession();
 
-  const deletedTodo = await prisma.todoItem.delete({
-    where: { id },
+  const deletedTodo = await prisma.todoItem.deleteMany({
+    where: {
+      id,
+      list: { household: { members: { some: { userId: session.user.id } } } },
+    },
   });
    
-  if (!deletedTodo) {
-    return NextResponse.json({ error: "The task could not be deleted." }, { status: 400 });
+  if (deletedTodo.count === 0) {
+    return NextResponse.json({ error: "Task not found." }, { status: 404 });
   }
   return NextResponse.json({ message: "Task deleted successfully." });
 

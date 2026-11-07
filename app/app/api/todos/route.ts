@@ -19,8 +19,16 @@ export async function GET(request: Request) {
 
     validateListId(listId);
 
-    const toDoList = await prisma.todoList.findUnique({
-        where: { id: listId },
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const toDoList = await prisma.todoList.findFirst({
+        where: {
+          id: listId,
+          household: { members: { some: { userId: session.user.id } } },
+        },
         include: {
             items: {
                 orderBy: { createdAt: "asc" },
@@ -35,6 +43,10 @@ export async function GET(request: Request) {
                 },
             },}
         })
+
+    if (!toDoList) {
+      return NextResponse.json({ error: "List not found." }, { status: 404 });
+    }
 
     // return the tasks in the current list
     return NextResponse.json({

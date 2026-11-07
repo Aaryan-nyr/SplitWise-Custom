@@ -3,7 +3,7 @@ import { Sidebar } from "../components/sidebar";
 import { AppTopBar } from "../components/app-top-bar";
 import { prisma } from "../lib/prisma";
 import { redirect } from "next/navigation";
-import { validateUserSession } from "../lib/auth-helpers";
+import { requirePageSession } from "../lib/auth-helpers";
 
 export default async function TodoPage({
   searchParams,
@@ -11,7 +11,7 @@ export default async function TodoPage({
   searchParams?: Promise<{ list?: string }> | { list?: string };
 }) {
     
-  const session = await validateUserSession();
+  const session = await requirePageSession();
 
   const userId = session.user.id;
   const params = searchParams ? await searchParams : {};
