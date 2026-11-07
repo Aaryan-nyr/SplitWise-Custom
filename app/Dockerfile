@@ -10,6 +10,8 @@ COPY . .
 RUN DATABASE_URL=${DATABASE_URL} npx prisma generate \
     && DATABASE_URL=${DATABASE_URL} npm run build
 
+ENV NODE_ENV=production
+
 EXPOSE 3000
 
-CMD ["bash", "./start-app.sh"]
+CMD ["bash", "-c", "npx prisma migrate deploy && exec bash ./start-app.sh"]

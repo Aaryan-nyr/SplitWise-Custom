@@ -7,31 +7,41 @@ services:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     ports:
-      - "5431:5432"
+      - "127.0.0.1:${DB_PORT}:5432"
     volumes:
       - household-split-db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${DB_USER} -d $${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 5s
       retries: 10
     mem_limit: 100m
     cpus: 0.3
 
-  app:
+  web:
     build: .
-    image: household-split-app
+    image: household-split-web
     restart: unless-stopped
-    env_file:
-      - .env.local
     environment:
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL in the Compose environment}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET in the Compose environment}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in the Compose environment}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in the Compose environment}
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${WEB_PORT}:3000"
     depends_on:
       db:
         condition: service_healthy
-    command: ["bash", "./start-app.sh"]
+    mem_limit: 512m
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:?Set TUNNEL_TOKEN in the Compose environment}
+    depends_on:
+      - web
+    mem_limit: 50m
 
 volumes:
   household-split-db:
