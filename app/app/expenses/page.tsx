@@ -7,7 +7,7 @@ import { ExpenseCard } from "../components/expense-card";
 import { Sidebar } from "../components/sidebar";
 import { AppTopBar } from "../components/app-top-bar";
 import { prisma } from "../lib/prisma";
-import { validateUserSession } from "../lib/auth-helpers";
+import { requirePageSession } from "../lib/auth-helpers";
 
 function formatCurrency(amount: Prisma.Decimal) {
   return new Intl.NumberFormat("en-US", {
@@ -29,7 +29,7 @@ function getMostFrequent(counts: Map<string, { name: string; count: number }>) {
 }
 
 export default async function ExpensesPage() {
-  const session = await validateUserSession();
+  const session = await requirePageSession();
   const membership = await prisma.householdMember.findFirst({
     where: { userId: session.user.id },
     orderBy: { joinedAt: "asc" },
@@ -154,7 +154,7 @@ export default async function ExpensesPage() {
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <Link
-                href="/e"
+                href="/expenses-add-new-entry"
                 className="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
               >
                 Add expense
@@ -255,6 +255,7 @@ export default async function ExpensesPage() {
                           : null,
                         expenseDate: expense.expenseDate.toISOString(),
                         splits: expense.splits.map((split) => ({
+                          userId: split.userId,
                           name: split.user.name ?? split.user.email,
                           amount: split.amountOwed.toFixed(2),
                         })),

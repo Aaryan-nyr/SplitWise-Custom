@@ -4,12 +4,12 @@ import { redirect } from "next/navigation";
 import { ExpenseForm } from "../components/expense-form";
 import { Sidebar } from "../components/sidebar";
 import { AppTopBar } from "../components/app-top-bar";
-import { validateUserSession } from "../lib/auth-helpers";
+import { requirePageSession } from "../lib/auth-helpers";
 import { prisma } from "../lib/prisma";
 
 // session validation to ensure user can actually add to the household
 export default async function AddExpensePage() {
-  const session = await validateUserSession();
+  const session = await requirePageSession();
   const membership = await prisma.householdMember.findFirst({
     where: { userId: session.user.id },
     orderBy: { joinedAt: "asc" },

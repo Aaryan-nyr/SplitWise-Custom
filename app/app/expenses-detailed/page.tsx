@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "../components/sidebar";
 import { AppTopBar } from "../components/app-top-bar";
 import { prisma } from "../lib/prisma";
-import { validateUserSession } from "../lib/auth-helpers";
+import { requirePageSession } from "../lib/auth-helpers";
 
 function formatCurrency(amount: Prisma.Decimal) {
   return new Intl.NumberFormat("en-US", {
@@ -16,7 +16,7 @@ function formatCurrency(amount: Prisma.Decimal) {
 }
 
 export default async function MonthlyExpensesIndexPage() {
-  const session = await validateUserSession();
+  const session = await requirePageSession();
   const membership = await prisma.householdMember.findFirst({
     where: { userId: session.user.id },
     orderBy: { joinedAt: "asc" },

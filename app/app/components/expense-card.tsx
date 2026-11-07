@@ -25,7 +25,7 @@ export type ExpenseCardData = {
   paidByName: string;
   createdByName: string | null;
   expenseDate: string;
-  splits: { name: string; amount: string }[];
+  splits: { userId: string; name: string; amount: string }[];
 };
 
 type HouseholdMember = { id: string; name: string };
@@ -149,10 +149,11 @@ export function ExpenseCard({
           {expense.createdByName && (
             <p className="text-sm text-slate-600">Added by {expense.createdByName}</p>
           )}
-          {expense.splits.length > 0 && (
+          {expense.splits.some((split) => split.userId !== expense.paidById) && (
             <p className="text-xs text-slate-500">
               Owed by{" "}
               {expense.splits
+                .filter((split) => split.userId !== expense.paidById)
                 .map((split) => `${split.name} ${formatCurrency(split.amount)}`)
                 .join(" · ")}
             </p>

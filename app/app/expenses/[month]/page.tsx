@@ -7,7 +7,7 @@ import { ExpenseCard } from "../../components/expense-card";
 import { Sidebar } from "../../components/sidebar";
 import { AppTopBar } from "../../components/app-top-bar";
 import { prisma } from "../../lib/prisma";
-import { validateUserSession } from "../../lib/auth-helpers";
+import { requirePageSession } from "../../lib/auth-helpers";
 
 const chartColors = ["#0284c7", "#7c3aed", "#059669", "#d97706", "#e11d48", "#0891b2"];
 
@@ -39,7 +39,7 @@ export default async function MonthlyExpensesPage({
     timeZone: "UTC",
   }).format(monthStart);
 
-  const session = await validateUserSession();
+  const session = await requirePageSession();
   const membership = await prisma.householdMember.findFirst({
     where: { userId: session.user.id },
     orderBy: { joinedAt: "asc" },
@@ -315,6 +315,7 @@ export default async function MonthlyExpensesPage({
                           : null,
                         expenseDate: expense.expenseDate.toISOString(),
                         splits: expense.splits.map((split) => ({
+                          userId: split.userId,
                           name: split.user.name ?? split.user.email,
                           amount: split.amountOwed.toFixed(2),
                         })),
