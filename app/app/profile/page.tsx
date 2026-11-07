@@ -6,11 +6,11 @@ import { AppTopBar } from "@/app/components/app-top-bar";
 import { InviteMembersButton } from "@/app/components/invite-members-button";
 import { ProfileForm } from "@/app/components/profile-form";
 import { Sidebar } from "@/app/components/sidebar";
-import { validateUserSession } from "@/app/lib/auth-helpers";
+import { requirePageSession } from "@/app/lib/auth-helpers";
 import { prisma } from "@/app/lib/prisma";
 
 export default async function ProfilePage() {
-  const session = await validateUserSession();
+  const session = await requirePageSession();
   const [user, membership] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
