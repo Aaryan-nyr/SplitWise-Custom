@@ -1,5 +1,22 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Container startup and test data
+
+Start the Compose stack from this directory with:
+
+```sh
+docker compose --env-file .env.local up --build
+```
+
+The `--env-file` option is important: Compose uses `.env.local` to substitute the
+`DB_NAME`, `DB_USER`, and `DB_PASSWORD` values in `docker-compose.yml`. The app
+container then waits for the database, applies pending migrations, and starts Next.js.
+The startup script does not run the Prisma seed command. The seed contains mock
+household data and refuses to run when `NODE_ENV=production`; the Docker image sets
+`NODE_ENV=production`.
+
+Run `npm run db:seed` only against a local development database.
+
 ## Getting Started
 
 First, run the development server:

@@ -2,6 +2,10 @@ import dotenv from "dotenv";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
+if (process.env.NODE_ENV === "production") {
+  throw new Error("Refusing to seed test data when NODE_ENV is production.");
+}
+
 dotenv.config({ path: ".env.local" });
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });

@@ -1,6 +1,7 @@
 import { TodoInput, ValidatedTodoInput } from "./task-constants";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/auth";
+import { redirect } from "next/navigation";
 
 const statuses = ["TODO", "INPROGRESS", "DONE", "OBSOLETE"] as const;
 const priorities = ["LOW", "MEDIUM", "HIGH"] as const;
@@ -17,6 +18,15 @@ export async function validateUserSession() {
   if (!session || !session.user || !session.user.id) {
       throw new Error("Unauthorized");
     }
+  return session;
+}
+
+// redirect to login page if no user session
+export async function requirePageSession() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
   return session;
 }
 
